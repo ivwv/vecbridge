@@ -222,6 +222,10 @@ pnpm pack:check     # preview exact file list included in npm publish
   - [`https://ivwv.github.io/vecbridge/api.html`](https://ivwv.github.io/vecbridge/api.html) — Searchable API reference
   - [`https://ivwv.github.io/vecbridge/dist/vecbridge.global.js`](https://ivwv.github.io/vecbridge/dist/vecbridge.global.js) — Bundled browser IIFE artifact (plus ESM `.js` modules)
 
+## Community & Acknowledgments
+
+Thanks to the [LINUX DO](https://linux.do) community for support and feedback. Feel free to join discussions there or open an issue / PR in this repository.
+
 ## License
 
 MIT

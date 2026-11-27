@@ -221,6 +221,10 @@ pnpm pack:check     # 预览即将发布到 npm 的文件清单
   - [`https://ivwv.github.io/vecbridge/api.html`](https://ivwv.github.io/vecbridge/api.html) — 可搜索 API 文档
   - [`https://ivwv.github.io/vecbridge/dist/vecbridge.global.js`](https://ivwv.github.io/vecbridge/dist/vecbridge.global.js) — 打包后的浏览器 IIFE 产物（同时附带 ESM `.js`）
 
+## 社区与致谢
+
+感谢 [LINUX DO](https://linux.do) 社区的支持与交流，欢迎前往社区讨论反馈或在本仓库提交 Issue / PR。
+
 ## License
 
 MIT
