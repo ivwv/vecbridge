@@ -3,3 +3,5 @@ dist
 site
 docs/api.html
 *.log
+ai-config.yaml
+ai-context.md
