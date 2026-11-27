@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VecBridge · API 绘图与多编码导出示例</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="./assets/tailwind-theme.js"></script>
+<link rel="stylesheet" href="./assets/demo.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased flex flex-col h-screen overflow-hidden">
+
+  <!-- 顶部导航 -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200/90 px-4 py-2.5 flex items-center gap-3 flex-wrap shrink-0 z-20">
+    <a href="./playground.html" class="flex items-center gap-2.5 mr-1 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+        VB
+      </div>
+      <div class="leading-tight">
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-slate-900 text-sm tracking-tight">VecBridge</span>
+          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/70">API 示例</span>
+        </div>
+        <p class="text-[11px] text-slate-500">DrawingDocument 纯 API 绘图 · 双引擎 1:1 同步 · 多编码导出</p>
+      </div>
+    </a>
+
+    <nav class="vb-seg hidden lg:inline-flex" aria-label="示例导航">
+      <a href="./playground.html" class="vb-seg-btn">工作台</a>
+      <a href="./dxf-preview.html" class="vb-seg-btn">DXF 预览</a>
+      <a href="./svg-to-dxf.html" class="vb-seg-btn">SVG → DXF</a>
+      <a href="./dom-to-dxf.html" class="vb-seg-btn">DOM → 矢量</a>
+      <a href="./canvas-record.html" class="vb-seg-btn">Canvas 录制</a>
+      <a href="./browser-demo.html" class="vb-seg-btn is-active">API 示例</a>
+      <a href="../docs/api.html" class="vb-seg-btn">API 文档</a>
+    </nav>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+        <span class="text-[11px] text-slate-500">DXF</span>
+        <select id="encodingSelect" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF 字节编码（AutoCAD/中望/浩辰推荐 GBK）">
+          <option value="gbk" selected>GBK · ANSI_936</option>
+          <option value="utf8">UTF-8</option>
+        </select>
+        <span class="text-slate-300">|</span>
+        <select id="fontSelect" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF STYLE 字体配方">
+          <option value="gbcbig" selected>txt + gbcbig</option>
+          <option value="gbenor">gbenor + gbcbig</option>
+          <option value="gbeitc">gbeitc + gbcbig</option>
+          <option value="hztxt">txt + hztxt</option>
+          <option value="hzfs">txt + hzfs</option>
+          <option value="romans">romans + gbcbig</option>
+          <option value="tssd">tssdeng + tssdchn</option>
+          <option value="simsun">simsun.ttf</option>
+        </select>
+      </div>
+      <button id="exportSvgBtn" class="vb-btn vb-btn-teal">导出 SVG</button>
+      <button id="exportBatchBtn" class="vb-btn">批量 16 份</button>
+      <button id="exportBtn" class="vb-btn vb-btn-primary">导出 DXF</button>
+    </div>
+  </header>
+
+  <!-- 主工作区 -->
+  <div class="flex-1 flex min-h-0 overflow-hidden">
+
+    <!-- 左侧：图纸构成与导出信息 -->
+    <aside class="w-[300px] xl:w-[320px] shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
+      <div class="flex-1 overflow-y-auto vb-scroll p-4 space-y-3.5">
+
+        <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-3 space-y-2">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">当前导出文件名</div>
+          <code id="filenamePreview" class="block font-mono text-[11px] text-blue-700 bg-white border border-slate-200 rounded-lg px-2.5 py-2 truncate">—</code>
+          <p class="text-[11px] text-slate-500 leading-relaxed">文件名自动拼入编码与字体，多次导出也能分清版本。</p>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-3 space-y-2">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">内置图层</div>
+          <ul class="space-y-1.5 text-[11px] text-slate-600">
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-slate-500"></span><span class="font-mono">FRAME_OUTER</span><span class="ml-auto text-slate-400">ACI 8</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-slate-900"></span><span class="font-mono">FRAME_BORDER</span><span class="ml-auto text-slate-400">ACI 7</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-slate-900"></span><span class="font-mono">TABLE_LINE</span><span class="ml-auto text-slate-400">ACI 7</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-slate-400"></span><span class="font-mono">GRID_DASH</span><span class="ml-auto text-slate-400">DASHED</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-slate-400"></span><span class="font-mono">HATCH_PAT</span><span class="ml-auto text-slate-400">ACI 8</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-rose-600"></span><span class="font-mono">CURVE_A</span><span class="ml-auto text-slate-400">ACI 1</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-blue-600"></span><span class="font-mono">CURVE_B</span><span class="ml-auto text-slate-400">ACI 5</span></li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-slate-900"></span><span class="font-mono">TEXT_*</span><span class="ml-auto text-slate-400">ACI 7</span></li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-3 space-y-2">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">演示内容</div>
+          <ul class="text-[11px] text-slate-600 space-y-1.5 leading-relaxed">
+            <li class="flex gap-2"><span class="text-slate-400">01</span>A4 图框与双线标题栏</li>
+            <li class="flex gap-2"><span class="text-slate-400">02</span>10mm 虚线参考网格</li>
+            <li class="flex gap-2"><span class="text-slate-400">03</span>diagonal / dots / crosshatch 三种填充</li>
+            <li class="flex gap-2"><span class="text-slate-400">04</span>两条正弦采样曲线</li>
+            <li class="flex gap-2"><span class="text-slate-400">05</span>R18 圆与尺寸标注</li>
+          </ul>
+        </div>
+
+        <div class="rounded-xl border border-blue-200/70 bg-blue-50/60 p-3">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-blue-600/80">导出矩阵</div>
+          <p class="text-[11px] text-blue-900/80 leading-relaxed mt-1.5">
+            批量导出 = 2 种编码（GBK / UTF-8）× 8 种 SHX 字体配方，共 16 份 DXF，文件名带时间戳。
+          </p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 右侧：双引擎预览 -->
+    <main class="flex-1 min-w-0 flex flex-col bg-slate-100/60">
+      <div class="bg-white border-b border-slate-200 px-3.5 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        <div class="flex items-center gap-1.5 text-xs text-slate-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span class="font-medium text-slate-700">双屏 1:1 同步</span>
+          <span class="text-slate-400">Canvas / SVG 同源渲染</span>
+        </div>
+        <button id="themeBtn" class="vb-btn">浅色打印底</button>
+        <button id="fitBtn" class="vb-btn">适配窗口</button>
+        <div class="flex-1"></div>
+        <div id="statsPill" class="text-[11.5px] text-slate-600 bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 font-mono">
+          就绪
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 flex relative">
+        <div id="canvasPane" class="flex-1 min-w-0 relative">
+          <span class="vb-badge vb-badge-blue">Canvas 光栅引擎</span>
+          <canvas id="previewCanvas" class="vb-canvas"></canvas>
+          <span class="vb-hint">滚轮缩放 · 左键拖拽（双屏 1:1 同步）</span>
+        </div>
+        <div id="svgPane" class="flex-1 min-w-0 relative border-l border-slate-200">
+          <span class="vb-badge vb-badge-teal">SVG 纯矢量引擎</span>
+          <div id="previewSvg" class="vb-svg-host"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../dist/vecbridge.global.js"></script>
+  <script src="./assets/demo-core.js"></script>
+  <script src="./js/browser-demo.js"></script>
+</body>
+</html>

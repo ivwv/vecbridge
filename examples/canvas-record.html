@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VecBridge · Canvas 2D API 矢量录制器</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="./assets/tailwind-theme.js"></script>
+<link rel="stylesheet" href="./assets/demo.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased flex flex-col h-screen overflow-hidden">
+
+  <!-- 顶部导航 -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200/90 px-4 py-2.5 flex items-center gap-3 flex-wrap shrink-0 z-20">
+    <a href="./playground.html" class="flex items-center gap-2.5 mr-1 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+        VB
+      </div>
+      <div class="leading-tight">
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-slate-900 text-sm tracking-tight">VecBridge</span>
+          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/70">Canvas 录制</span>
+        </div>
+        <p class="text-[11px] text-slate-500">recordCanvasContext 拦截标准 2D 指令 · 所绘即所导</p>
+      </div>
+    </a>
+
+    <nav class="vb-seg hidden lg:inline-flex" aria-label="示例导航">
+      <a href="./playground.html" class="vb-seg-btn">工作台</a>
+      <a href="./dxf-preview.html" class="vb-seg-btn">DXF 预览</a>
+      <a href="./svg-to-dxf.html" class="vb-seg-btn">SVG → DXF</a>
+      <a href="./dom-to-dxf.html" class="vb-seg-btn">DOM → 矢量</a>
+      <a href="./canvas-record.html" class="vb-seg-btn is-active">Canvas 录制</a>
+      <a href="./browser-demo.html" class="vb-seg-btn">API 示例</a>
+      <a href="../docs/api.html" class="vb-seg-btn">API 文档</a>
+    </nav>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+        <span class="text-[11px] text-slate-500">DXF</span>
+        <select id="encodingSelect" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF 字节编码">
+          <option value="gbk" selected>GBK · ANSI_936</option>
+          <option value="utf8">UTF-8</option>
+        </select>
+        <span class="text-slate-300">|</span>
+        <select id="fontSelect" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF STYLE 字体配方">
+          <option value="gbenor" selected>gbenor + gbcbig</option>
+          <option value="gbcbig">txt + gbcbig</option>
+          <option value="gbeitc">gbeitc + gbcbig</option>
+          <option value="hztxt">txt + hztxt</option>
+          <option value="hzfs">txt + hzfs</option>
+          <option value="romans">romans + gbcbig</option>
+          <option value="tssd">tssdeng + tssdchn</option>
+          <option value="simsun">simsun.ttf</option>
+        </select>
+      </div>
+      <button id="exportSvgBtn" class="vb-btn vb-btn-teal">导出 SVG</button>
+      <button id="exportDxfBtn" class="vb-btn vb-btn-primary">导出 DXF</button>
+    </div>
+  </header>
+
+  <!-- 主工作区 -->
+  <div class="flex-1 flex min-h-0 overflow-hidden">
+
+    <!-- 左侧：真实 Canvas 绘制区 -->
+    <aside class="w-[460px] xl:w-[500px] shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
+      <div class="p-3 border-b border-slate-200 bg-slate-50 space-y-2.5 shrink-0">
+        <div id="sceneSeg" class="vb-seg">
+          <button data-seg="geo" class="vb-seg-btn vb-seg-btn-solid is-active">示例 1 · 几何与曲线</button>
+          <button data-seg="chart" class="vb-seg-btn vb-seg-btn-solid">示例 2 · 柱状折线</button>
+          <button data-seg="blank" class="vb-seg-btn vb-seg-btn-solid">清空自由手绘</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <label class="space-y-1 col-span-2">
+            <span class="text-[11px] text-slate-500 block">输出图幅</span>
+            <select id="widthSelect" class="vb-select">
+              <option value="297" selected>适配 A4 横版 (297mm)</option>
+              <option value="210">适配 A4 竖版 (210mm)</option>
+              <option value="0">原始 96DPI 物理尺寸</option>
+            </select>
+          </label>
+          <label class="space-y-1">
+            <span class="text-[11px] text-slate-500 block">填充模式</span>
+            <select id="fillModeSelect" class="vb-select">
+              <option value="solid" selected>SOLID 实心</option>
+              <option value="outline">闭合轮廓线</option>
+              <option value="ignore">仅保留描边</option>
+            </select>
+          </label>
+          <label class="space-y-1">
+            <span class="text-[11px] text-slate-500 block">手绘画笔</span>
+            <select id="brushColorSelect" class="vb-select">
+              <option value="#d92121" selected>红色 (ACI 1)</option>
+              <option value="#0f5acc">蓝色 (ACI 5)</option>
+              <option value="#168f33">绿色 (ACI 3)</option>
+              <option value="#111827">黑色 (ACI 7)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto vb-scroll p-4 bg-slate-100/70 flex items-center justify-center">
+        <canvas id="drawCanvas" width="640" height="440" class="bg-white rounded-xl border border-slate-200 shadow-sm max-w-full h-auto cursor-crosshair"></canvas>
+      </div>
+
+      <div class="border-t border-slate-200 px-4 py-2.5 text-[11px] text-slate-500 leading-relaxed shrink-0">
+        由 <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700">recordCanvasContext(realCtx)</code>
+        实时双写录制 · 可按住鼠标左键直接在画布上叠加手绘矢量线
+      </div>
+    </aside>
+
+    <!-- 右侧：录制结果双引擎预览 -->
+    <main class="flex-1 min-w-0 flex flex-col bg-slate-100/60">
+      <div class="bg-white border-b border-slate-200 px-3.5 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        <div id="viewSeg" class="vb-seg">
+          <button data-seg="both" class="vb-seg-btn is-active">双屏对比</button>
+          <button data-seg="canvas" class="vb-seg-btn">仅 Canvas</button>
+          <button data-seg="svg" class="vb-seg-btn">仅 SVG</button>
+        </div>
+        <button id="themeBtn" class="vb-btn">浅色打印底</button>
+        <button id="fitBtn" class="vb-btn">适配窗口</button>
+        <div class="flex-1"></div>
+        <div id="statsPill" class="text-[11.5px] text-slate-600 bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 font-mono">
+          就绪
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 flex relative">
+        <div id="canvasPane" class="flex-1 min-w-0 relative">
+          <span class="vb-badge vb-badge-blue">Canvas 录制预览</span>
+          <canvas id="previewCanvas" class="vb-canvas"></canvas>
+          <span class="vb-hint">滚轮缩放 · 左键拖拽（双屏 1:1 同步）</span>
+        </div>
+        <div id="svgPane" class="flex-1 min-w-0 relative border-l border-slate-200">
+          <span class="vb-badge vb-badge-teal">SVG 同源核对</span>
+          <div id="previewSvg" class="vb-svg-host"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../dist/vecbridge.global.js"></script>
+  <script src="./assets/demo-core.js"></script>
+  <script src="./js/canvas-record.js"></script>
+</body>
+</html>

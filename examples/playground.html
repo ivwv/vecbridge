@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VecBridge Playground · 2D 矢量互转与双引擎预览工作台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="./assets/tailwind-theme.js"></script>
+<link rel="stylesheet" href="./assets/demo.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased flex flex-col h-screen overflow-hidden">
+
+  <!-- 顶部导航与全局导出栏 -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200/90 px-4 py-2.5 flex items-center gap-3 flex-wrap shrink-0 z-20">
+    <!-- Brand -->
+    <div class="flex items-center gap-2.5 mr-2">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+        VB
+      </div>
+      <div class="leading-tight">
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-slate-900 text-sm tracking-tight">VecBridge</span>
+          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">Playground</span>
+        </div>
+        <p class="text-[11px] text-slate-500">DXF / SVG / HTML DOM / Canvas 互转与双引擎预览</p>
+      </div>
+    </div>
+
+    <!-- 模式切换 Tabs -->
+    <nav id="modeTabs" class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+      <button data-tab="dxf" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-white text-blue-700 shadow-sm">
+        DXF 预览 &amp; 转 SVG
+      </button>
+      <button data-tab="svg" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-600 hover:text-slate-900">
+        SVG → DXF
+      </button>
+      <button data-tab="dom" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-600 hover:text-slate-900">
+        HTML DOM → 矢量
+      </button>
+      <button data-tab="canvas" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-600 hover:text-slate-900">
+        Canvas 2D 录制
+      </button>
+    </nav>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-1.5">
+      <a href="./browser-demo.html" class="vb-btn hidden xl:inline-flex">专题示例</a>
+      <a href="../docs/api.html" class="vb-btn">API 文档</a>
+      <a href="https://github.com/ivwv/vecbridge" target="_blank" rel="noopener" class="vb-btn hidden sm:inline-flex">GitHub</a>
+    </div>
+
+    <!-- 全局导出参数与操作 -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+        <span class="text-[11px] text-slate-500">DXF</span>
+        <select id="globalEncoding" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF 字节编码（AutoCAD/中望/浩辰推荐使用 GBK）">
+          <option value="gbk" selected>GBK (ANSI_936)</option>
+          <option value="utf8">UTF-8</option>
+        </select>
+        <span class="text-slate-300">|</span>
+        <select id="globalFont" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF STYLE 字体配方">
+          <option value="gbenor" selected>gbenor + gbcbig</option>
+          <option value="gbcbig">txt + gbcbig</option>
+          <option value="gbeitc">gbeitc + gbcbig</option>
+          <option value="hztxt">txt + hztxt</option>
+          <option value="hzfs">txt + hzfs</option>
+          <option value="romans">romans + gbcbig</option>
+          <option value="tssd">tssdeng + tssdchn</option>
+          <option value="simsun">simsun.ttf</option>
+        </select>
+      </div>
+
+      <button id="exportSvgBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-colors">
+        导出 SVG
+      </button>
+      <button id="exportDxfBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors">
+        导出 DXF
+      </button>
+    </div>
+  </header>
+
+  <!-- 主工作区：左侧源输入 + 右侧统一双引擎预览 -->
+  <div class="flex-1 flex min-h-0 overflow-hidden">
+
+    <!-- 左侧源工作区 -->
+    <aside id="leftPanel" class="w-[460px] xl:w-[500px] shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
+
+      <!-- ============ TAB 1: DXF 预览 & 转 SVG ============ -->
+      <section id="panel-dxf" class="tab-panel flex-1 overflow-y-auto p-4 space-y-3.5">
+        <input type="file" id="dxfFileInput" accept=".dxf" class="hidden" />
+        <div id="dxfDropZone" class="border-2 border-dashed border-blue-200 hover:border-blue-400 bg-blue-50/40 hover:bg-blue-50/80 rounded-xl p-4 text-center cursor-pointer transition-all">
+          <div class="text-xs font-semibold text-blue-700">点击选择或拖拽本地 .dxf 文件到此处</div>
+          <div class="text-[11px] text-slate-500 mt-1">支持 R12 ~ R2024+ ASCII DXF，以原始字节读取自动识别 GBK / UTF-8</div>
+        </div>
+
+        <div class="flex gap-2">
+          <button id="dxfSampleBtn" class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700">
+            加载内置机械零件示例 DXF
+          </button>
+          <button id="dxfClearBtn" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600">
+            清空
+          </button>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-3 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">解析参数</div>
+          <div class="grid grid-cols-2 gap-2.5 text-xs">
+            <label class="space-y-1">
+              <span class="text-slate-600 block">源文件编码</span>
+              <select id="dxfEncoding" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                <option value="auto" selected>自动检测（推荐）</option>
+                <option value="gbk">GBK / ANSI_936</option>
+                <option value="utf-8">UTF-8</option>
+                <option value="big5">Big5（繁体）</option>
+                <option value="shift-jis">Shift-JIS（日文）</option>
+              </select>
+            </label>
+            <label class="space-y-1">
+              <span class="text-slate-600 block">空间过滤</span>
+              <select id="dxfSpace" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                <option value="model" selected>仅模型空间</option>
+                <option value="paper">仅图纸空间</option>
+                <option value="all">全部空间</option>
+              </select>
+            </label>
+            <label class="space-y-1">
+              <span class="text-slate-600 block">曲线细分容差 (mm)</span>
+              <input id="dxfTol" type="number" value="0.1" step="0.05" min="0.01" max="5" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500" />
+            </label>
+            <label class="flex items-center gap-2 pt-5 cursor-pointer select-none">
+              <input id="dxfHiddenLayers" type="checkbox" class="rounded border-slate-300 text-blue-600" />
+              <span class="text-slate-600">显示隐藏/冻结图层</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="dxfDiagBox" class="rounded-xl bg-emerald-50/70 border border-emerald-200/80 px-3 py-2.5 text-xs text-emerald-900 leading-relaxed">
+          就绪
+        </div>
+        <div id="dxfWarnBox" class="hidden rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 whitespace-pre-wrap"></div>
+        <div id="dxfErrBox" class="hidden rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
+
+        <div class="space-y-1.5">
+          <div class="text-xs font-medium text-slate-600">或粘贴 ASCII DXF 源码</div>
+          <textarea id="dxfText" spellcheck="false" class="w-full h-36 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 font-mono text-[11px] text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500 resize-y" placeholder="粘贴以 0 / SECTION 开头的 ASCII DXF 文本"></textarea>
+        </div>
+      </section>
+
+      <!-- ============ TAB 2: SVG → DXF ============ -->
+      <section id="panel-svg" class="tab-panel hidden flex-1 overflow-y-auto p-4 space-y-3.5">
+        <input type="file" id="svgFileInput" accept=".svg,image/svg+xml" class="hidden" />
+        <div id="svgDropZone" class="border-2 border-dashed border-teal-200 hover:border-teal-400 bg-teal-50/40 hover:bg-teal-50/80 rounded-xl p-4 text-center cursor-pointer transition-all">
+          <div class="text-xs font-semibold text-teal-700">点击选择或拖拽 .svg 文件到此处</div>
+          <div class="text-[11px] text-slate-500 mt-1">支持 path 贝塞尔/椭圆弧、圆角矩形、transform 矩阵、&lt;defs&gt;/&lt;use&gt; 与文字</div>
+        </div>
+
+        <div class="flex gap-2">
+          <button id="svgSampleBtn" class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700">
+            加载内置矢量示例 SVG
+          </button>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl border border-slate-200/80 p-3 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">SVG 解析参数</div>
+          <div class="grid grid-cols-2 gap-2.5 text-xs">
+            <label class="space-y-1">
+              <span class="text-slate-600 block">Y 轴翻转模式</span>
+              <select id="svgYAxis" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                <option value="flip-viewbox" selected>flip-viewbox（外部推荐）</option>
+                <option value="negate">negate（精确往返）</option>
+              </select>
+            </label>
+            <label class="space-y-1">
+              <span class="text-slate-600 block">图层归类方式</span>
+              <select id="svgLayerBy" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                <option value="group-id" selected>按 &lt;g id&gt; / data-layer</option>
+                <option value="color">按 ACI 颜色分层</option>
+                <option value="single">合并到单图层 0</option>
+              </select>
+            </label>
+            <label class="space-y-1">
+              <span class="text-slate-600 block">纯填充处理</span>
+              <select id="svgFillMode" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                <option value="outline" selected>转为闭合轮廓线</option>
+                <option value="solid">DXF 实心填充（SOLID）</option>
+                <option value="ignore">忽略无描边填充</option>
+              </select>
+            </label>
+            <label class="space-y-1">
+              <span class="text-slate-600 block">曲线容差 (mm)</span>
+              <input id="svgTol" type="number" value="0.1" step="0.05" min="0.01" max="5" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500" />
+            </label>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer pt-1">
+            <input id="svgIgnoreBg" type="checkbox" checked class="rounded border-slate-300 text-blue-600" />
+            自动跳过覆盖全画布的背景矩形
+          </label>
+        </div>
+
+        <div id="svgErrBox" class="hidden rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
+
+        <div class="space-y-1.5">
+          <div class="text-xs font-medium text-slate-600">SVG 源码（可直接编辑实时生效）</div>
+          <textarea id="svgText" spellcheck="false" class="w-full h-60 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 font-mono text-[11px] text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500 resize-y"></textarea>
+        </div>
+      </section>
+
+      <!-- ============ TAB 3: HTML DOM → SVG / DXF ============ -->
+      <section id="panel-dom" class="tab-panel hidden flex-1 flex flex-col min-h-0">
+        <div class="p-3 border-b border-slate-200 bg-slate-50 space-y-2 shrink-0">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-semibold text-slate-700">真实 HTML 布局提取（可直接编辑下方文字/表单）</span>
+            <button id="domRefreshBtn" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
+              刷新提取
+            </button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <select id="domWidth" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
+              <option value="297" selected>适配 A4 横版 (297mm)</option>
+              <option value="210">适配 A4 竖版 (210mm)</option>
+              <option value="0">原始 96DPI 尺寸</option>
+            </select>
+            <select id="domBgMode" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
+              <option value="ignore" selected>背景：纯线稿</option>
+              <option value="solid">背景：SOLID 实心</option>
+              <option value="outline">背景：轮廓线</option>
+              <option value="hatch">背景：斜线填充</option>
+            </select>
+            <label class="flex items-center gap-1.5 text-slate-600 cursor-pointer pl-1">
+              <input id="domDedupe" type="checkbox" checked class="rounded border-slate-300 text-blue-600" />
+              合并表格重边
+            </label>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4 bg-slate-100/80">
+          <div id="domSourceSheet" class="vb-sheet mx-auto shadow-sm">
+            <div class="vb-bind" data-dxf-layer="BINDING">装订线</div>
+            <div class="vb-ignore" data-dxf-ignore>
+              标注了 <code>data-dxf-ignore</code> 的提示条会自动跳过导出；修改下方表格或表单后点「刷新提取」。
+            </div>
+
+            <div class="vb-head" data-dxf-layer="TITLE_BLOCK">
+              <div>
+                <div class="vb-title" contenteditable="true">模块化机械组件规格与交付清单</div>
+                <div class="vb-sub">VecBridge DOM 实时提取 · 表格重边合并 + Range 自动换行 + 内嵌 SVG</div>
+              </div>
+              <div class="vb-pill">检验通过</div>
+            </div>
+
+            <table data-dxf-layer="META_TABLE">
+              <colgroup>
+                <col style="width: 16%" /><col style="width: 34%" />
+                <col style="width: 16%" /><col style="width: 34%" />
+              </colgroup>
+              <tr>
+                <th>产品型号</th>
+                <td><input class="vb-input" type="text" value="VB-200 精密伺服滑台模组" /></td>
+                <th>文档编号</th>
+                <td><input class="vb-input" type="text" value="SPEC-2026-088" /></td>
+              </tr>
+              <tr>
+                <th>交付阶段</th>
+                <td>
+                  <select class="vb-input">
+                    <option>工程样机 (EVT)</option>
+                    <option selected>量产交付 (MP)</option>
+                    <option>定制方案 (OEM)</option>
+                  </select>
+                </td>
+                <th>签发日期</th>
+                <td style="text-align:center;">2026.11.24</td>
+              </tr>
+            </table>
+
+            <table data-dxf-layer="DATA_TABLE">
+              <thead>
+                <tr>
+                  <th style="width: 10%">序号</th>
+                  <th style="width: 28%">部件名称</th>
+                  <th style="width: 16%">标称 (mm)</th>
+                  <th style="width: 15%">公差</th>
+                  <th style="width: 16%">实测均值</th>
+                  <th style="width: 15%">工艺</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="text-align:center;">01</td>
+                  <td>铝合金底座框架</td>
+                  <td style="text-align:right;">240.00</td>
+                  <td style="text-align:right;">±0.05</td>
+                  <td style="text-align:right; color:#0f5acc; font-weight:700;">240.01</td>
+                  <td style="text-align:center;">阳极氧化</td>
+                </tr>
+                <tr>
+                  <td style="text-align:center;">02</td>
+                  <td>精密线性导轨副</td>
+                  <td style="text-align:right;">180.00</td>
+                  <td style="text-align:right;">±0.02</td>
+                  <td style="text-align:right; color:#0f5acc; font-weight:700;">180.00</td>
+                  <td style="text-align:center;">高频淬火</td>
+                </tr>
+                <tr>
+                  <td style="text-align:center;">03</td>
+                  <td>滚珠丝杠驱动轴</td>
+                  <td style="text-align:right;">16.00</td>
+                  <td style="text-align:right;">±0.01</td>
+                  <td style="text-align:right; color:#d92121; font-weight:700;">16.008</td>
+                  <td style="text-align:center;">精密研磨</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="vb-card-row">
+              <div class="vb-box" data-dxf-layer="EMBED_CHART">
+                <div style="font-weight:700; font-size:11.5px; margin-bottom:4px;">内嵌 SVG 响应效率曲线</div>
+                <svg viewBox="0 0 320 104" style="width:100%; height:104px; display:block;">
+                  <line x1="30" y1="10" x2="30" y2="86" stroke="#111827" stroke-width="1.2" />
+                  <line x1="30" y1="86" x2="306" y2="86" stroke="#111827" stroke-width="1.2" />
+                  <line x1="30" y1="36" x2="306" y2="36" stroke="#6b7280" stroke-width="0.8" stroke-dasharray="4,3" />
+                  <line x1="30" y1="62" x2="306" y2="62" stroke="#6b7280" stroke-width="0.8" stroke-dasharray="4,3" />
+                  <path d="M 30 78 C 100 72, 180 34, 298 18" fill="none" stroke="#d92121" stroke-width="2" />
+                  <circle cx="122" cy="59" r="3.2" fill="none" stroke="#0f5acc" stroke-width="1.5" />
+                  <circle cx="210" cy="34" r="3.2" fill="none" stroke="#0f5acc" stroke-width="1.5" />
+                  <circle cx="298" cy="18" r="3.2" fill="none" stroke="#0f5acc" stroke-width="1.5" />
+                  <text x="168" y="100" font-size="9.5" fill="#111827" text-anchor="middle">输入转速 (rpm)</text>
+                </svg>
+              </div>
+
+              <div class="vb-check-box" data-dxf-layer="CHECK_ITEMS">
+                <div style="font-weight:700; font-size:11.5px;">出厂复核项</div>
+                <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="checkbox" checked /> 尺寸三坐标全检</label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="checkbox" checked /> 满载运行测试</label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="checkbox" /> 选配防尘护罩</label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="radio" name="pg_grade" checked /> 标准 A 级出厂</label>
+              </div>
+            </div>
+
+            <div class="vb-card-row" data-dxf-layer="NOTES">
+              <div class="vb-box" style="background:#ffffff;">
+                <strong>装配步骤（有序列表）</strong>
+                <ol>
+                  <li>清洁基准安装面并校验平行度</li>
+                  <li>按对角顺序分两次锁紧螺栓</li>
+                </ol>
+              </div>
+              <div class="vb-box" style="background:#ffffff;">
+                <strong>交付物清单（无序列表）</strong>
+                <ul>
+                  <li>检测报告矢量图（.SVG）</li>
+                  <li style="list-style-type: square; color:#ea580c;">二维接口 CAD 图纸（.DXF）</li>
+                </ul>
+              </div>
+            </div>
+
+            <hr />
+            <div class="vb-note" contenteditable="true" data-dxf-layer="NOTES">
+              备注：本段较长中文说明用于验证浏览器原生 Range 自动换行算法——每一视觉行都会独立映射为对齐精确的 CAD TEXT 实体，导出 AutoCAD 后排版依然整洁不重叠。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 4: Canvas 2D 矢量录制 ============ -->
+      <section id="panel-canvas" class="tab-panel hidden flex-1 flex flex-col min-h-0">
+        <div class="p-3 border-b border-slate-200 bg-slate-50 space-y-2.5 shrink-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button data-cscene="geo" class="cscene-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white">
+              几何与贝塞尔曲线
+            </button>
+            <button data-cscene="chart" class="cscene-btn px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100">
+              数据柱状折线图
+            </button>
+            <button data-cscene="blank" class="cscene-btn px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100">
+              清空自由手绘
+            </button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <select id="canvasWidthMm" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
+              <option value="297" selected>适配 A4 (297mm)</option>
+              <option value="210">适配 210mm</option>
+              <option value="0">96DPI 原始尺寸</option>
+            </select>
+            <select id="canvasFillMode" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
+              <option value="solid" selected>填充：SOLID 实心</option>
+              <option value="outline">填充：闭合轮廓</option>
+              <option value="ignore">填充：仅留描边</option>
+            </select>
+            <select id="brushColor" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs" title="在下方画布按住左键手绘的颜色">
+              <option value="#d92121" selected>画笔：红色</option>
+              <option value="#0f5acc">画笔：蓝色</option>
+              <option value="#168f33">画笔：绿色</option>
+              <option value="#111827">画笔：黑色</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4 bg-slate-100/70 flex flex-col items-center justify-center gap-2.5">
+          <div class="text-[11px] text-slate-500">
+            由 <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700">recordCanvasContext(realCtx)</code> 实时双写录制 · 可按住鼠标左键直接手绘叠加矢量
+          </div>
+          <canvas id="drawCanvas" width="520" height="360" class="bg-white rounded-xl border border-slate-200 shadow-sm max-w-full h-auto cursor-crosshair"></canvas>
+        </div>
+      </section>
+    </aside>
+
+    <!-- 右侧统一双引擎预览区 -->
+    <main class="flex-1 min-w-0 flex flex-col bg-slate-100/60">
+      <!-- 预览控制栏 -->
+      <div class="bg-white border-b border-slate-200 px-3.5 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
+          <button data-view="both" class="view-btn px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-slate-900 shadow-sm">
+            双屏对比
+          </button>
+          <button data-view="canvas" class="view-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">
+            仅 Canvas
+          </button>
+          <button data-view="svg" class="view-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">
+            仅 SVG
+          </button>
+          <button id="visualSvgTabBtn" data-view="visual" class="view-btn hidden px-2.5 py-1 rounded-md text-xs font-medium text-teal-700 hover:text-teal-900">
+            高保真 Visual SVG
+          </button>
+        </div>
+
+        <button id="previewThemeBtn" class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700">
+          浅色打印底
+        </button>
+        <button id="fitBtn" class="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700">
+          适配窗口
+        </button>
+
+        <div class="flex-1"></div>
+
+        <div id="statsPill" class="text-[11.5px] text-slate-600 bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 font-mono">
+          就绪
+        </div>
+      </div>
+
+      <!-- 预览画布容器 -->
+      <div class="flex-1 min-h-0 flex relative">
+        <div id="cadDualHost" class="flex-1 flex min-w-0 min-h-0">
+          <div id="previewCanvasPane" class="flex-1 min-w-0 relative">
+            <span class="absolute top-2.5 left-3 z-10 pointer-events-none px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-600/90 text-white shadow-sm">
+              Canvas 光栅引擎
+            </span>
+            <canvas id="previewCanvas" class="vb-canvas"></canvas>
+            <span class="absolute bottom-2.5 right-3 z-10 pointer-events-none px-2 py-0.5 rounded-md text-[11px] bg-white/85 text-slate-600 border border-slate-200/80 shadow-sm">
+              滚轮缩放 · 左键拖拽（双屏 1:1 同步）
+            </span>
+          </div>
+          <div id="previewSvgPane" class="flex-1 min-w-0 relative border-l border-slate-200">
+            <span class="absolute top-2.5 left-3 z-10 pointer-events-none px-2 py-0.5 rounded-md text-[11px] font-semibold bg-teal-600/90 text-white shadow-sm">
+              SVG 纯矢量引擎
+            </span>
+            <div id="previewSvg" class="vb-svg-host"></div>
+          </div>
+        </div>
+
+        <div id="visualSvgHost" class="hidden flex-1 vb-visual-host p-6 bg-slate-100 flex items-start justify-center"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 引入构建产物（发布至 CDN 后可替换为 https://unpkg.com/vecbridge/dist/vecbridge.global.js） -->
+  <script src="../dist/vecbridge.global.js"></script>
+  <script src="./assets/demo-core.js"></script>
+  <script src="./js/playground.js"></script>
+</body>
+</html>

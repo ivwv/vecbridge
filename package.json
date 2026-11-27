@@ -1,0 +1,125 @@
+{
+  "name": "vecbridge",
+  "version": "1.0.0",
+  "description": "Zero-dependency 2D vector IR, multi-format converter (HTML DOM / SVG / Canvas 2D / DXF) and 1:1 Canvas+SVG dual-engine viewer with native CJK/GBK CAD support",
+  "keywords": [
+    "vecbridge",
+    "vector",
+    "dxf",
+    "svg",
+    "canvas",
+    "dom",
+    "cad",
+    "dxf-parser",
+    "dxf-viewer",
+    "svg-to-dxf",
+    "html-to-dxf",
+    "canvas-to-dxf",
+    "dxf-to-svg",
+    "gbk",
+    "typescript"
+  ],
+  "author": "ivwv (https://github.com/ivwv)",
+  "homepage": "https://ivwv.github.io/vecbridge/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivwv/vecbridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ivwv/vecbridge/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./encoding": {
+      "types": "./dist/encoding.d.ts",
+      "import": "./dist/encoding.js",
+      "require": "./dist/encoding.cjs"
+    },
+    "./dxf": {
+      "types": "./dist/dxf.d.ts",
+      "import": "./dist/dxf.js",
+      "require": "./dist/dxf.cjs"
+    },
+    "./svg": {
+      "types": "./dist/svg.d.ts",
+      "import": "./dist/svg.js",
+      "require": "./dist/svg.cjs"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js",
+      "require": "./dist/render.cjs"
+    },
+    "./patterns": {
+      "types": "./dist/patterns.d.ts",
+      "import": "./dist/patterns.js",
+      "require": "./dist/patterns.cjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js",
+      "require": "./dist/browser.cjs"
+    },
+    "./canvas": {
+      "types": "./dist/canvas.d.ts",
+      "import": "./dist/canvas.js",
+      "require": "./dist/canvas.cjs"
+    },
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "import": "./dist/dom.js",
+      "require": "./dist/dom.cjs"
+    },
+    "./global": "./dist/vecbridge.global.js",
+    "./package.json": "./package.json"
+  },
+  "unpkg": "./dist/vecbridge.global.js",
+  "jsdelivr": "./dist/vecbridge.global.js",
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:debug": "tsup --config tsup.debug.config.ts",
+    "dev": "tsup --config tsup.debug.config.ts --watch",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "pnpm typecheck && pnpm build && pnpm test",
+    "baseline": "UPDATE_BASELINE=1 vitest run test/golden.test.ts",
+    "docs:api": "node scripts/build-docs.mjs",
+    "build:site": "pnpm build && pnpm docs:api && node scripts/build-site.mjs",
+    "pack:check": "pnpm build && npm pack --dry-run",
+    "prepublishOnly": "pnpm verify"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.6.6",
+    "jsdom": "^31.0.1",
+    "marked": "^18.2.1",
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.1"
+  }
+}

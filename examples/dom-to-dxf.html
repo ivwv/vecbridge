@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VecBridge · HTML DOM → SVG / DXF 实时转换器</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="./assets/tailwind-theme.js"></script>
+<link rel="stylesheet" href="./assets/demo.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased flex flex-col h-screen overflow-hidden">
+
+  <!-- 顶部导航 -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200/90 px-4 py-2.5 flex items-center gap-3 flex-wrap shrink-0 z-20">
+    <a href="./playground.html" class="flex items-center gap-2.5 mr-1 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-teal-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+        VB
+      </div>
+      <div class="leading-tight">
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-slate-900 text-sm tracking-tight">VecBridge</span>
+          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/70">DOM → 矢量</span>
+        </div>
+        <p class="text-[11px] text-slate-500">读取浏览器真实布局 · 表格去重边 / 表单 / 换行文字 / 内嵌 SVG</p>
+      </div>
+    </a>
+
+    <nav class="vb-seg hidden lg:inline-flex" aria-label="示例导航">
+      <a href="./playground.html" class="vb-seg-btn">工作台</a>
+      <a href="./dxf-preview.html" class="vb-seg-btn">DXF 预览</a>
+      <a href="./svg-to-dxf.html" class="vb-seg-btn">SVG → DXF</a>
+      <a href="./dom-to-dxf.html" class="vb-seg-btn is-active">DOM → 矢量</a>
+      <a href="./canvas-record.html" class="vb-seg-btn">Canvas 录制</a>
+      <a href="./browser-demo.html" class="vb-seg-btn">API 示例</a>
+      <a href="../docs/api.html" class="vb-seg-btn">API 文档</a>
+    </nav>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+        <span class="text-[11px] text-slate-500">DXF</span>
+        <select id="encodingSelect" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF 字节编码（AutoCAD/中望/浩辰推荐 GBK）">
+          <option value="gbk" selected>GBK · ANSI_936</option>
+          <option value="utf8">UTF-8</option>
+        </select>
+        <span class="text-slate-300">|</span>
+        <select id="fontSelect" class="text-xs bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer" title="DXF STYLE 字体配方">
+          <option value="gbenor" selected>gbenor + gbcbig</option>
+          <option value="gbcbig">txt + gbcbig</option>
+          <option value="gbeitc">gbeitc + gbcbig</option>
+          <option value="hztxt">txt + hztxt</option>
+          <option value="hzfs">txt + hzfs</option>
+          <option value="romans">romans + gbcbig</option>
+          <option value="tssd">tssdeng + tssdchn</option>
+          <option value="simsun">simsun.ttf</option>
+        </select>
+      </div>
+      <button id="exportVisualSvgBtn" class="vb-btn vb-btn-teal">导出高保真 SVG</button>
+      <button id="exportCadSvgBtn" class="vb-btn">导出 CAD SVG</button>
+      <button id="exportDxfBtn" class="vb-btn vb-btn-primary">导出 DXF</button>
+    </div>
+  </header>
+
+  <!-- 主工作区 -->
+  <div class="flex-1 flex min-h-0 overflow-hidden">
+
+    <!-- 左侧：待转换的真实 DOM 技术规格单 -->
+    <aside class="w-1/2 min-w-[380px] max-w-[760px] shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0">
+      <div class="p-3 border-b border-slate-200 bg-slate-50 space-y-2 shrink-0">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-slate-700">真实 HTML 布局提取（可直接编辑下方文字 / 表单）</span>
+          <button id="refreshBtn" class="vb-btn vb-btn-primary px-2.5 py-1">刷新提取</button>
+        </div>
+        <div class="grid grid-cols-2 xl:grid-cols-4 gap-2">
+          <select id="widthSelect" class="vb-select" title="输出图幅">
+            <option value="297" selected>A4 横版 297mm</option>
+            <option value="210">A4 竖版 210mm</option>
+            <option value="0">原始 96DPI</option>
+          </select>
+          <select id="bgModeSelect" class="vb-select" title="背景色处理">
+            <option value="ignore" selected>背景：纯线稿</option>
+            <option value="solid">背景：SOLID 实心</option>
+            <option value="outline">背景：轮廓线</option>
+            <option value="hatch">背景：斜线填充</option>
+          </select>
+          <select id="layerBySelect" class="vb-select" title="图层策略">
+            <option value="semantic" selected>按语义 + data-dxf-layer</option>
+            <option value="id">按元素 id / data-layer</option>
+            <option value="color">按 ACI 颜色分层</option>
+            <option value="single">合并到单图层 0</option>
+          </select>
+          <label class="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none">
+            <input id="dedupeCheck" type="checkbox" checked class="vb-check" />
+            合并表格重边
+          </label>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto vb-scroll p-5 bg-slate-100/80">
+        <div id="sourceSheet" class="vb-sheet mx-auto shadow-sm">
+          <div class="vb-bind" data-dxf-layer="BINDING">装订线</div>
+          <div class="vb-ignore" data-dxf-ignore>
+            标注了 <code>data-dxf-ignore</code> 的提示条会自动跳过导出；修改下方表格或表单后点「刷新提取」。
+          </div>
+
+          <div class="vb-head" data-dxf-layer="TITLE_BLOCK">
+            <div>
+              <div class="vb-title" contenteditable="true">模块化机械组件规格与交付清单</div>
+              <div class="vb-sub">VecBridge DOM 实时提取 · 表格重边合并 + Range 自动换行 + 内嵌 SVG</div>
+            </div>
+            <div class="vb-pill">检验通过</div>
+          </div>
+
+          <table data-dxf-layer="META_TABLE">
+            <colgroup>
+              <col style="width: 16%" /><col style="width: 34%" />
+              <col style="width: 16%" /><col style="width: 34%" />
+            </colgroup>
+            <tr>
+              <th>产品型号</th>
+              <td><input class="vb-input" type="text" value="VB-200 精密伺服滑台模组" /></td>
+              <th>文档编号</th>
+              <td><input class="vb-input" type="text" value="SPEC-2026-088" /></td>
+            </tr>
+            <tr>
+              <th>交付阶段</th>
+              <td>
+                <select class="vb-input">
+                  <option>工程样机 (EVT)</option>
+                  <option selected>量产交付 (MP)</option>
+                  <option>定制方案 (OEM)</option>
+                </select>
+              </td>
+              <th>签发日期</th>
+              <td style="text-align:center;">2026.11.24</td>
+            </tr>
+          </table>
+
+          <table data-dxf-layer="DATA_TABLE">
+            <thead>
+              <tr>
+                <th style="width: 10%">序号</th>
+                <th style="width: 28%">部件名称</th>
+                <th style="width: 16%">标称 (mm)</th>
+                <th style="width: 15%">公差</th>
+                <th style="width: 16%">实测均值</th>
+                <th style="width: 15%">工艺</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="text-align:center;">01</td>
+                <td>铝合金底座框架</td>
+                <td style="text-align:right;">240.00</td>
+                <td style="text-align:right;">±0.05</td>
+                <td style="text-align:right; color:#0f5acc; font-weight:700;">240.01</td>
+                <td style="text-align:center;">阳极氧化</td>
+              </tr>
+              <tr>
+                <td style="text-align:center;">02</td>
+                <td>精密线性导轨副</td>
+                <td style="text-align:right;">180.00</td>
+                <td style="text-align:right;">±0.02</td>
+                <td style="text-align:right; color:#0f5acc; font-weight:700;">180.00</td>
+                <td style="text-align:center;">高频淬火</td>
+              </tr>
+              <tr>
+                <td style="text-align:center;">03</td>
+                <td>滚珠丝杠驱动轴</td>
+                <td style="text-align:right;">16.00</td>
+                <td style="text-align:right;">±0.01</td>
+                <td style="text-align:right; color:#d92121; font-weight:700;">16.008</td>
+                <td style="text-align:center;">精密研磨</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="vb-card-row">
+            <div class="vb-box" data-dxf-layer="EMBED_CHART">
+              <div style="font-weight:700; font-size:11.5px; margin-bottom:4px;">内嵌 SVG 响应效率曲线</div>
+              <svg viewBox="0 0 320 104" style="width:100%; height:104px; display:block;">
+                <line x1="30" y1="10" x2="30" y2="86" stroke="#111827" stroke-width="1.2" />
+                <line x1="30" y1="86" x2="306" y2="86" stroke="#111827" stroke-width="1.2" />
+                <line x1="30" y1="36" x2="306" y2="36" stroke="#6b7280" stroke-width="0.8" stroke-dasharray="4,3" />
+                <line x1="30" y1="62" x2="306" y2="62" stroke="#6b7280" stroke-width="0.8" stroke-dasharray="4,3" />
+                <path d="M 30 78 C 100 72, 180 34, 298 18" fill="none" stroke="#d92121" stroke-width="2" />
+                <circle cx="122" cy="59" r="3.2" fill="none" stroke="#0f5acc" stroke-width="1.5" />
+                <circle cx="210" cy="34" r="3.2" fill="none" stroke="#0f5acc" stroke-width="1.5" />
+                <circle cx="298" cy="18" r="3.2" fill="none" stroke="#0f5acc" stroke-width="1.5" />
+                <text x="168" y="100" font-size="9.5" fill="#111827" text-anchor="middle">输入转速 (rpm)</text>
+              </svg>
+            </div>
+
+            <div class="vb-check-box" data-dxf-layer="CHECK_ITEMS">
+              <div style="font-weight:700; font-size:11.5px;">出厂复核项</div>
+              <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="checkbox" checked /> 尺寸三坐标全检</label>
+              <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="checkbox" checked /> 满载运行测试</label>
+              <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="checkbox" /> 选配防尘护罩</label>
+              <label style="display:flex; align-items:center; gap:5px; font-size:11.5px;"><input type="radio" name="pg_grade" checked /> 标准 A 级出厂</label>
+            </div>
+          </div>
+
+          <div class="vb-card-row" data-dxf-layer="NOTES">
+            <div class="vb-box" style="background:#ffffff;">
+              <strong>装配步骤（有序列表）</strong>
+              <ol>
+                <li>清洁基准安装面并校验平行度</li>
+                <li>按对角顺序分两次锁紧螺栓</li>
+              </ol>
+            </div>
+            <div class="vb-box" style="background:#ffffff;">
+              <strong>交付物清单（无序列表）</strong>
+              <ul>
+                <li>检测报告矢量图（.SVG）</li>
+                <li style="list-style-type: square; color:#ea580c;">二维接口 CAD 图纸（.DXF）</li>
+              </ul>
+            </div>
+          </div>
+
+          <hr />
+          <div class="vb-note" contenteditable="true" data-dxf-layer="NOTES">
+            备注：本段较长中文说明用于验证浏览器原生 Range 自动换行算法——每一视觉行都会独立映射为对齐精确的 CAD TEXT 实体，导出 AutoCAD 后排版依然整洁不重叠。
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 右侧：CAD 双引擎 / 高保真 SVG -->
+    <main class="flex-1 min-w-0 flex flex-col bg-slate-100/60">
+      <div class="bg-white border-b border-slate-200 px-3.5 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        <div id="viewSeg" class="vb-seg">
+          <button data-seg="cad" class="vb-seg-btn is-active">CAD 双引擎预览</button>
+          <button data-seg="visual" class="vb-seg-btn">高保真矢量 SVG</button>
+        </div>
+        <button id="themeBtn" class="vb-btn">浅色打印底</button>
+        <button id="fitBtn" class="vb-btn">适配窗口</button>
+        <div class="flex-1"></div>
+        <div id="statsPill" class="text-[11.5px] text-slate-600 bg-slate-50 border border-slate-200/90 rounded-lg px-2.5 py-1 font-mono">
+          就绪
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 relative">
+        <div id="cadHost" class="absolute inset-0 flex">
+          <div id="canvasPane" class="flex-1 min-w-0 relative">
+            <span class="vb-badge vb-badge-blue">Canvas CAD 预览</span>
+            <canvas id="previewCanvas" class="vb-canvas"></canvas>
+            <span class="vb-hint">滚轮缩放 · 左键拖拽（双屏 1:1 同步）</span>
+          </div>
+          <div id="svgPane" class="flex-1 min-w-0 relative border-l border-slate-200">
+            <span class="vb-badge vb-badge-teal">SVG CAD 同源核对</span>
+            <div id="previewSvg" class="vb-svg-host"></div>
+          </div>
+        </div>
+
+        <div id="visualHost" class="hidden flex vb-visual-host absolute inset-0 p-6 bg-slate-100 items-start justify-center"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../dist/vecbridge.global.js"></script>
+  <script src="./assets/demo-core.js"></script>
+  <script src="./js/dom-to-dxf.js"></script>
+</body>
+</html>
